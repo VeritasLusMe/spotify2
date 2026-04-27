@@ -3,11 +3,12 @@
 //  Applies the user's chosen tweaks as fixed defaults:
 //    light theme · editorial fonts · classic lyrics · slideUp · 58px
 //    art glow ON · lyrics panel ON
-//  Audio playback uses a real HTML5 <audio> element via useAudioPlayer.
+//  Audio playback uses the Spotify Web Playback SDK via useSpotifyPlayer.
 // ════════════════════════════════════════════════════════════
 import React, { useState, useEffect, useRef } from 'react';
-import { SONGS } from './songs.js';
-import { useAudioPlayer } from './audio.js';
+import { SONGS } from './songs.runtime.js';
+import { useSpotifyPlayer } from './spotify-player.js';
+import { beginLogin, handleCallback, isConfigured, isLoggedIn, logout } from './spotify-auth.js';
 import {
   SETTINGS, getTheme, FONT_PAIRS, ANIMS, ICONS,
   fmt, getLIdx, NOISE_BG,
@@ -429,14 +430,17 @@ export default function App() {
   const song = SONGS[songIdx];
   const C = song.colors;
 
-  // Real audio playback hook
-  const audio = useAudioPlayer({
+  // Spotify Web Playback SDK hook (replaces local audio element)
+  const audio = useSpotifyPlayer({
     song,
     onEnded: () => {
       if (repeat) audio.seek(0);
       else nextSong();
     },
   });
+
+  // Complete Spotify OAuth callback if URL has ?code= on first load.
+  useEffect(() => { handleCallback(); }, []);
 
   const time = audio.time;
   const duration = audio.duration || song.duration || 1;
@@ -477,17 +481,62 @@ export default function App() {
   const nextSong = () => { setSongIdx(i => (i + 1) % SONGS.length); };
   const prevSong = () => { setSongIdx(i => (i - 1 + SONGS.length) % SONGS.length); };
   const playSong = (id) => {
+    if (audio.needsLogin) {
+      if (isConfigured()) beginLogin();
+      return;
+    }
     setSongIdx(id);
     setView('player');
-    // Audio element load happens via useEffect on song change; play after
     setTimeout(() => audio.play(), 100);
   };
 
   // Player view background: dynamic gradient from album palette (always vivid, regardless of theme)
   const playerBg = `radial-gradient(ellipse 80% 60% at 25% 0%, ${C.bg3}dd 0%, transparent 58%), radial-gradient(ellipse 55% 70% at 85% 100%, ${C.accent}33 0%, transparent 55%), radial-gradient(ellipse 100% 100% at 50% 50%, ${C.bg2} 0%, ${C.bg1} 100%)`;
 
+  const configured = isConfigured();
+  const banner =
+    !configured ? { kind: 'setup', text: 'Spotify가 설정되지 않았습니다. VITE_SPOTIFY_CLIENT_ID를 .env.local에 추가하세요.' }
+    : audio.error === 'premium_required' ? { kind: 'error', text: 'Spotify Premium 계정이 필요합니다.' }
+    : audio.error ? { kind: 'error', text: `Spotify 오류: ${audio.error}` }
+    : audio.needsLogin ? { kind: 'login', text: '재생하려면 Spotify 로그인이 필요합니다.' }
+    : null;
+
   return (
     <div style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column', background: T.bg, overflow: 'hidden', fontFamily: F.body }}>
+      {banner && (
+        <div style={{
+          flexShrink: 0,
+          padding: '8px 16px',
+          background: banner.kind === 'error' ? '#7f1d1d' : banner.kind === 'login' ? '#1db954' : '#374151',
+          color: '#fff',
+          fontSize: 12,
+          fontWeight: 600,
+          letterSpacing: '0.01em',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 12,
+          fontFamily: F.body,
+        }}>
+          <span>{banner.text}</span>
+          {banner.kind === 'login' && (
+            <button onClick={beginLogin} style={{
+              padding: '5px 14px', borderRadius: 14, border: 'none', cursor: 'pointer',
+              background: '#fff', color: '#1db954', fontSize: 11, fontWeight: 700, fontFamily: F.body,
+            }}>
+              Spotify 로그인
+            </button>
+          )}
+          {banner.kind !== 'login' && isLoggedIn() && (
+            <button onClick={() => { logout(); window.location.reload(); }} style={{
+              padding: '4px 10px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.4)', cursor: 'pointer',
+              background: 'transparent', color: '#fff', fontSize: 10, fontWeight: 600, fontFamily: F.body,
+            }}>
+              로그아웃
+            </button>
+          )}
+        </div>
+      )}
       {/* macOS title bar */}
       <div style={{ height: 40, background: T.macBg, display: 'flex', alignItems: 'center', paddingLeft: 16, gap: 10, flexShrink: 0, borderBottom: `1px solid ${T.border}`, userSelect: 'none' }}>
         <div style={{ display: 'flex', gap: 7 }}>

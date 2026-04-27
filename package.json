@@ -4,6 +4,9 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "fetch:meta": "node scripts/fetch-metadata.mjs",
+    "predev": "node scripts/fetch-metadata.mjs",
+    "prebuild": "node scripts/fetch-metadata.mjs",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview"
