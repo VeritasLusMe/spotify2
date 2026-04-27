@@ -1,0 +1,33 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body, #root { width: 100%; height: 100%; overflow: hidden; }
+body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
+button { font-family: inherit; }
+button:focus { outline: none; }
+
+input[type=range] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 3px;
+  border-radius: 2px;
+  cursor: pointer;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  cursor: pointer;
+}
+
+/* Hide scrollbars while keeping scroll */
+.ns::-webkit-scrollbar { display: none; }
+.ns { scrollbar-width: none; }
+
+/* Lyric transition keyframes */
+@keyframes lyrFadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes lyrFade   { from { opacity: 0; }                              to { opacity: 1; } }
+@keyframes lyrScale  { from { opacity: 0; transform: scale(0.88); }      to { opacity: 1; transform: scale(1); } }
+@keyframes lyrBlur   { from { opacity: 0; filter: blur(10px); }          to { opacity: 1; filter: blur(0); } }
+@keyframes lyrWipe   { from { clip-path: inset(0 100% 0 0); }            to { clip-path: inset(0 0% 0 0); } }
+@keyframes fadeIn    { from { opacity: 0; transform: translateY(8px); }  to { opacity: 1; transform: translateY(0); } }
