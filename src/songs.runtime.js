@@ -2,10 +2,9 @@
 //  songs.runtime.js — Merges your curated list (songs.js) with
 //  build-time Spotify metadata (songs.generated.json).
 //
-//  The result is a normalized SONGS array that the App consumes,
-//  matching the shape the original local-file player expected:
+//  The result is a normalized SONGS array that the App consumes:
 //    { id, spotifyId, title, artist, album, art, duration, year,
-//      tag, short, genre, colors, lyrics, tracks }
+//      tag, genre, colors, lyrics, tracks }
 // ════════════════════════════════════════════════════════════
 import { SONGS as RAW } from './songs.js';
 
@@ -39,7 +38,6 @@ export const SONGS = RAW.map((s, i) => {
     duration,
     year,
     tag: s.tag || '',
-    short: s.short || title.split(' ').slice(0, 2).join(' '),
     genre: s.genre || '',
     colors: s.colors,
     lyrics: s.lyrics || [{ t: 0, text: '♪' }],

@@ -111,6 +111,9 @@ export async function handleCallback() {
     persist(tok);
     localStorage.removeItem(LS.verifier);
     cleanUrl();
+    // Force a fresh mount so the player hook re-evaluates isLoggedIn() and
+    // the runtime metadata fetch effect runs against the new token.
+    window.location.reload();
     return true;
   } catch (e) {
     console.error('[spotify-auth] callback failed', e);
