@@ -54,14 +54,22 @@ async function getToken(id, secret) {
 
 async function fetchTracks(ids, token) {
   const out = {};
+  const market = process.env.SPOTIFY_MARKET || 'US';
   for (let i = 0; i < ids.length; i += 50) {
     const batch = ids.slice(i, i + 50);
-    const url = `https://api.spotify.com/v1/tracks?ids=${batch.join(',')}`;
+    const url = `https://api.spotify.com/v1/tracks?ids=${batch.join(',')}&market=${market}`;
     const res = await fetch(url, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${token}`, 'User-Agent': 'editorial-player/0.1' },
     });
     if (!res.ok) {
-      throw new Error(`Tracks request failed: ${res.status} ${await res.text()}`);
+      const body = await res.text().catch(() => '');
+      // 403 from /v1/tracks under client_credentials is a known gotcha for new
+      // Spotify apps post Nov-2024. We log it loudly but don't crash — the
+      // runtime falls back to fetching metadata with the user's PKCE token
+      // after they log in.
+      console.warn(`[fetch-metadata] Tracks request failed: ${res.status} ${body}`);
+      console.warn(`[fetch-metadata] Continuing with placeholders for: ${batch.join(', ')}`);
+      continue;
     }
     const json = await res.json();
     for (const t of json.tracks || []) {
@@ -116,11 +124,22 @@ async function main() {
   }
 
   console.log(`[fetch-metadata] Fetching metadata for ${ids.length} track(s)...`);
-  const token = await getToken(id, secret);
-  const map = await fetchTracks(ids, token);
+  let map = {};
+  try {
+    const token = await getToken(id, secret);
+    map = await fetchTracks(ids, token);
+  } catch (err) {
+    console.warn('[fetch-metadata] API call failed — writing placeholders so the build can proceed.');
+    console.warn('[fetch-metadata]', err.message || err);
+    console.warn(
+      '[fetch-metadata] The app will fetch metadata at runtime once a user logs in via Spotify.'
+    );
+  }
+  // Fill any unfetched IDs with placeholders so the runtime always sees an entry.
   const missing = ids.filter((x) => !map[x]);
   if (missing.length) {
-    console.warn(`[fetch-metadata] Missing tracks (invalid IDs?):`, missing);
+    Object.assign(map, placeholder(missing));
+    console.warn(`[fetch-metadata] ${missing.length} track(s) missing metadata — using placeholders.`);
   }
   writeFileSync(OUT, JSON.stringify(map, null, 2));
   console.log(`[fetch-metadata] Wrote ${OUT} (${Object.keys(map).length} entries)`);
@@ -128,5 +147,9 @@ async function main() {
 
 main().catch((err) => {
   console.error('[fetch-metadata] FAILED:', err);
-  process.exit(1);
+  // Don't fail the build — emit empty placeholders and exit 0.
+  try {
+    writeFileSync(OUT, JSON.stringify({}, null, 2));
+  } catch {}
+  process.exit(0);
 });

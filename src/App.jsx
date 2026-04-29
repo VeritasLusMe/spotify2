@@ -6,9 +6,9 @@
 //  Audio playback uses the Spotify Web Playback SDK via useSpotifyPlayer.
 // ════════════════════════════════════════════════════════════
 import React, { useState, useEffect, useRef } from 'react';
-import { SONGS } from './songs.runtime.js';
+import { SONGS as INITIAL_SONGS } from './songs.runtime.js';
 import { useSpotifyPlayer } from './spotify-player.js';
-import { beginLogin, handleCallback, isConfigured, isLoggedIn, logout } from './spotify-auth.js';
+import { beginLogin, handleCallback, isConfigured, isLoggedIn, logout, getAccessToken } from './spotify-auth.js';
 import {
   SETTINGS, getTheme, FONT_PAIRS, ANIMS, ICONS,
   fmt, getLIdx, NOISE_BG,
@@ -227,16 +227,16 @@ function ListRow({ song, index, onClick, T, F }) {
 }
 
 // ─── Home view ─────────────────────────────────────────────────
-function HomeView({ onPlay, T, F }) {
+function HomeView({ songs, onPlay, T, F }) {
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good Morning' : hour < 18 ? 'Good Afternoon' : 'Good Evening';
   const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 
   // Pick songs for each section. With your own catalog, the first two are
   // featured, all are quick picks, the last 4 are recently played.
-  const featured = SONGS.slice(0, 2);
-  const picks = SONGS;
-  const recent = [...SONGS].slice(-4);
+  const featured = songs.slice(0, 2);
+  const picks = songs;
+  const recent = [...songs].slice(-4);
 
   return (
     <div className="ns" style={{ flex: 1, overflowY: 'auto', padding: '32px 36px 24px', position: 'relative', animation: 'fadeIn 0.5s ease' }}>
@@ -412,10 +412,14 @@ function CB({ children, onClick, title }) {
 
 // ─── Main App ──────────────────────────────────────────────────
 export default function App() {
+  // Songs start from build-time data (songs.runtime) and get enriched with
+  // real Spotify metadata once the user logs in (see effect below).
+  const [songs, setSongs] = useState(INITIAL_SONGS);
+
   // Restore last session (song index) from localStorage if present
   const [songIdx, setSongIdx] = useState(() => {
     const saved = parseInt(localStorage.getItem('lastSongIdx') || '0', 10);
-    return saved >= 0 && saved < SONGS.length ? saved : 0;
+    return saved >= 0 && saved < INITIAL_SONGS.length ? saved : 0;
   });
   const [view, setView] = useState('home');             // 'home' | 'player' | 'album'
   const [albumIdx, setAlbumIdx] = useState(0);
@@ -427,7 +431,7 @@ export default function App() {
   const T = getTheme(SETTINGS.theme);
   const F = FONT_PAIRS[SETTINGS.fontPair] || FONT_PAIRS.editorial;
 
-  const song = SONGS[songIdx];
+  const song = songs[songIdx];
   const C = song.colors;
 
   // Spotify Web Playback SDK hook (replaces local audio element)
@@ -441,6 +445,64 @@ export default function App() {
 
   // Complete Spotify OAuth callback if URL has ?code= on first load.
   useEffect(() => { handleCallback(); }, []);
+
+  // Once logged in, enrich any songs that are missing real metadata
+  // (i.e. the build-time fetch failed or used placeholders).
+  useEffect(() => {
+    let cancelled = false;
+    async function enrich() {
+      const stale = songs.filter((s) => s.spotifyId && s._missingMeta);
+      if (stale.length === 0) return;
+      const token = await getAccessToken();
+      if (!token || cancelled) return;
+      const ids = stale.map((s) => s.spotifyId);
+      const fmtDur = (sec) => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
+      const fetched = {};
+      for (let i = 0; i < ids.length; i += 50) {
+        const batch = ids.slice(i, i + 50);
+        const url = `https://api.spotify.com/v1/tracks?ids=${batch.join(',')}`;
+        const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+        if (!res.ok) {
+          console.warn('[runtime-meta] fetch failed', res.status);
+          return;
+        }
+        const json = await res.json();
+        for (const t of json.tracks || []) {
+          if (!t) continue;
+          const art = (t.album?.images || []).slice().sort((a, b) => b.width - a.width)[0];
+          fetched[t.id] = {
+            title: t.name,
+            artist: (t.artists || []).map((a) => a.name).join(', '),
+            album: t.album?.name || '',
+            art: art?.url || '',
+            duration: Math.round((t.duration_ms || 0) / 1000),
+            year: (t.album?.release_date || '').slice(0, 4),
+          };
+        }
+      }
+      if (cancelled) return;
+      setSongs((prev) =>
+        prev.map((s) => {
+          const m = fetched[s.spotifyId];
+          if (!m) return s;
+          return {
+            ...s,
+            title: m.title,
+            artist: m.artist,
+            album: m.album,
+            art: m.art,
+            duration: m.duration,
+            year: m.year,
+            short: s.short || m.title.split(' ').slice(0, 2).join(' '),
+            tracks: [{ n: 1, title: m.title, dur: fmtDur(m.duration) }],
+            _missingMeta: false,
+          };
+        })
+      );
+    }
+    if (!audio.needsLogin) enrich();
+    return () => { cancelled = true; };
+  }, [audio.needsLogin]);
 
   const time = audio.time;
   const duration = audio.duration || song.duration || 1;
@@ -478,8 +540,8 @@ export default function App() {
     const r = e.currentTarget.getBoundingClientRect();
     audio.setVolume(Math.round(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * 100));
   };
-  const nextSong = () => { setSongIdx(i => (i + 1) % SONGS.length); };
-  const prevSong = () => { setSongIdx(i => (i - 1 + SONGS.length) % SONGS.length); };
+  const nextSong = () => { setSongIdx(i => (i + 1) % songs.length); };
+  const prevSong = () => { setSongIdx(i => (i - 1 + songs.length) % songs.length); };
   const playSong = (id) => {
     if (audio.needsLogin) {
       if (isConfigured()) beginLogin();
@@ -576,7 +638,7 @@ export default function App() {
           <div style={{ height: 1, background: T.border, margin: '6px 14px' }} />
           <div style={{ flex: 1, overflowY: 'auto', padding: '4px 10px 12px' }} className="ns">
             <div style={{ fontSize: 9, color: T.text4, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', padding: '6px 12px 8px' }}>Library</div>
-            {SONGS.map(s => (
+            {songs.map(s => (
               <div key={s.id} onClick={() => playSong(s.id)} style={{ fontSize: 12, color: T.text3, padding: '7px 12px', borderRadius: 6, cursor: 'pointer', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', transition: 'color 0.15s, background 0.15s' }}
                    onMouseEnter={e => { e.currentTarget.style.color = T.text1; e.currentTarget.style.background = T.hoverBg; e.currentTarget.style.fontStyle = 'italic'; }}
                    onMouseLeave={e => { e.currentTarget.style.color = T.text3; e.currentTarget.style.background = 'transparent'; e.currentTarget.style.fontStyle = 'normal'; }}>
@@ -621,7 +683,7 @@ export default function App() {
             </div>
             {view === 'player' && (
               <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', maxWidth: '60%', justifyContent: 'flex-end' }}>
-                {SONGS.map((s, i) => (
+                {songs.map((s, i) => (
                   <button key={s.id} onClick={() => { setSongIdx(i); setTimeout(() => audio.play(), 100); }}
                           style={{ padding: '4px 10px', borderRadius: 14, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, fontFamily: F.body, transition: 'all 0.22s', background: i === songIdx ? s.colors.accent : 'rgba(255,255,255,0.07)', color: i === songIdx ? '#fff' : 'rgba(255,255,255,0.5)', boxShadow: i === songIdx ? `0 0 10px ${s.colors.accent}44` : 'none' }}>
                     {s.short}
@@ -634,9 +696,9 @@ export default function App() {
           {/* Routed content */}
           <div style={{ flex: 1, position: 'relative', zIndex: 5, overflow: 'hidden', display: 'flex' }}>
             {view === 'home'
-              ? <HomeView onPlay={playSong} T={T} F={F} />
+              ? <HomeView songs={songs} onPlay={playSong} T={T} F={F} />
               : view === 'album'
-                ? <AlbumView song={SONGS[albumIdx]} onPlay={playSong} onBack={() => setView('home')} T={T} F={F} />
+                ? <AlbumView song={songs[albumIdx]} onPlay={playSong} onBack={() => setView('home')} T={T} F={F} />
                 : SETTINGS.showLyrics
                   ? (SETTINGS.lyricsStyle === 'classic'
                       ? <LyricsClassic song={song} lyricIdx={lyricIdx} C={C} F={F} fontSize={SETTINGS.lyricsFontSize} transition={SETTINGS.lyricsTransition} key={`classic-${songIdx}`} />
