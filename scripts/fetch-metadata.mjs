@@ -53,37 +53,39 @@ async function getToken(id, secret) {
 }
 
 async function fetchTracks(ids, token) {
+  // The bulk endpoint `GET /v1/tracks?ids=...` was REMOVED in Spotify's
+  // February 2026 Dev Mode changes. We now hit `GET /v1/tracks/{id}`
+  // once per track, which is still available.
   const out = {};
-  const market = process.env.SPOTIFY_MARKET || 'US';
-  for (let i = 0; i < ids.length; i += 50) {
-    const batch = ids.slice(i, i + 50);
-    const url = `https://api.spotify.com/v1/tracks?ids=${batch.join(',')}&market=${market}`;
-    const res = await fetch(url, {
-      headers: { Authorization: `Bearer ${token}`, 'User-Agent': 'editorial-player/0.1' },
-    });
-    if (!res.ok) {
-      const body = await res.text().catch(() => '');
-      // 403 from /v1/tracks under client_credentials is a known gotcha for new
-      // Spotify apps post Nov-2024. We log it loudly but don't crash — the
-      // runtime falls back to fetching metadata with the user's PKCE token
-      // after they log in.
-      console.warn(`[fetch-metadata] Tracks request failed: ${res.status} ${body}`);
-      console.warn(`[fetch-metadata] Continuing with placeholders for: ${batch.join(', ')}`);
+  for (const id of ids) {
+    let res;
+    try {
+      res = await fetch(`https://api.spotify.com/v1/tracks/${id}`, {
+        headers: { Authorization: `Bearer ${token}`, 'User-Agent': 'editorial-player/0.1' },
+      });
+    } catch (e) {
+      console.warn(`[fetch-metadata] ${id} network error: ${e?.message || e}`);
       continue;
     }
-    const json = await res.json();
-    for (const t of json.tracks || []) {
-      if (!t) continue;
-      const art = (t.album?.images || []).slice().sort((a, b) => b.width - a.width)[0];
-      out[t.id] = {
-        title: t.name,
-        artist: (t.artists || []).map((a) => a.name).join(', '),
-        album: t.album?.name || '',
-        art: art?.url || '',
-        duration: Math.round((t.duration_ms || 0) / 1000),
-        year: (t.album?.release_date || '').slice(0, 4),
-      };
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      // Client Credentials on a new (post Nov-2024) Spotify app can 403 here.
+      // We log and continue — the runtime fallback in App.jsx will fill the
+      // gap once a user logs in via PKCE.
+      console.warn(`[fetch-metadata] ${id} failed: ${res.status} ${body}`);
+      continue;
     }
+    const t = await res.json().catch(() => null);
+    if (!t || !t.id) continue;
+    const art = (t.album?.images || []).slice().sort((a, b) => b.width - a.width)[0];
+    out[t.id] = {
+      title: t.name,
+      artist: (t.artists || []).map((a) => a.name).join(', '),
+      album: t.album?.name || '',
+      art: art?.url || '',
+      duration: Math.round((t.duration_ms || 0) / 1000),
+      year: (t.album?.release_date || '').slice(0, 4),
+    };
   }
   return out;
 }
