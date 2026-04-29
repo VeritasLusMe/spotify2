@@ -441,6 +441,11 @@ export default function App() {
 
   // Once logged in, enrich any songs that are missing real metadata
   // (i.e. the build-time fetch failed or used placeholders).
+  //
+  // NOTE: The bulk endpoint `GET /v1/tracks?ids=...` was REMOVED for
+  // Development Mode apps in Spotify's February 2026 Web API changes.
+  // We now fetch each track individually via `GET /v1/tracks/{id}`,
+  // which remains available with a user (PKCE) token.
   useEffect(() => {
     let cancelled = false;
     async function enrich() {
@@ -451,28 +456,34 @@ export default function App() {
       const ids = stale.map((s) => s.spotifyId);
       const fmtDur = (sec) => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
       const fetched = {};
-      for (let i = 0; i < ids.length; i += 50) {
-        const batch = ids.slice(i, i + 50);
-        const url = `https://api.spotify.com/v1/tracks?ids=${batch.join(',')}`;
-        const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      for (const id of ids) {
+        if (cancelled) return;
+        const url = `https://api.spotify.com/v1/tracks/${id}`;
+        let res;
+        try {
+          res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+        } catch (e) {
+          console.warn(`[runtime-meta] network error for ${id}:`, e?.message || e);
+          continue;
+        }
         if (!res.ok) {
-          console.warn('[runtime-meta] fetch failed', res.status);
-          return;
+          // One bad track shouldn't sink the rest. Skip and keep going.
+          console.warn(`[runtime-meta] fetch failed for ${id}:`, res.status);
+          continue;
         }
-        const json = await res.json();
-        for (const t of json.tracks || []) {
-          if (!t) continue;
-          const art = (t.album?.images || []).slice().sort((a, b) => b.width - a.width)[0];
-          fetched[t.id] = {
-            title: t.name,
-            artist: (t.artists || []).map((a) => a.name).join(', '),
-            album: t.album?.name || '',
-            art: art?.url || '',
-            duration: Math.round((t.duration_ms || 0) / 1000),
-            year: (t.album?.release_date || '').slice(0, 4),
-          };
-        }
+        const t = await res.json().catch(() => null);
+        if (!t || !t.id) continue;
+        const art = (t.album?.images || []).slice().sort((a, b) => b.width - a.width)[0];
+        fetched[t.id] = {
+          title: t.name,
+          artist: (t.artists || []).map((a) => a.name).join(', '),
+          album: t.album?.name || '',
+          art: art?.url || '',
+          duration: Math.round((t.duration_ms || 0) / 1000),
+          year: (t.album?.release_date || '').slice(0, 4),
+        };
       }
+      if (Object.keys(fetched).length === 0) return;
       if (cancelled) return;
       setSongs((prev) =>
         prev.map((s) => {
