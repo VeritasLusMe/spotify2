@@ -93,7 +93,7 @@ export const SONGS = [
     short: 'Blue Valentine',
     tag: 'MELANCHOLIA',
     genre: 'K-Pop',
-    colors: PALETTES.blueValentine,
+    colors: PALETTES.blue,
     // 타임스탬프는 3:06 트랙 구조 기준 추정치 — 실제 들으면서 ±2~5초 조정 권장
     lyrics: [
       { t: 0,   text: '♪' },
