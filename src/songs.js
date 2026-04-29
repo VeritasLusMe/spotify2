@@ -86,7 +86,6 @@ export const SONGS = [
   },
   {
     spotifyId: '0FKR7mQJnYqdEmHAMhgQjw',  // NMIXX — Blue Valentine (2025)
-    short: 'Blue Valentine',
     tag: 'MELANCHOLIA',
     genre: 'K-Pop',
     colors: PALETTES.blue,
