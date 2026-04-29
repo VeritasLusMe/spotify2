@@ -36,19 +36,17 @@ export const PALETTES = {
 // ─── 노래 등록 (Your Songs) ───────────────────────────────────
 // 각 곡 객체 필드:
 //   spotifyId  (필수) Spotify 트랙 ID
-//   short      (필수) 우측 상단 알약 버튼에 표시할 짧은 이름
 //   tag        (선택) 에디토리얼 라벨 (대문자 권장, 예: 'MY FAVORITE')
 //   genre      (선택) 장르 표기 — Spotify는 트랙 장르를 제공하지 않아 직접 입력
 //   colors     (필수) PALETTES 중 하나 또는 직접 정의한 5단계 컬러
 //   lyrics     (필수) [{ t: 초, text: '가사' }, ...]
 //
-//   title/artist/album/art/duration/year 는 빌드 스크립트가 자동으로 채웁니다.
+//   title/artist/album/art/duration/year 는 Spotify에서 자동으로 채워집니다.
 //   직접 값을 넣으면 그 값이 우선 사용됩니다.
 
 export const SONGS = [
   {
     spotifyId: '4uLU6hMCjMI75M1A2tKUQC',  // Rick Astley — Never Gonna Give You Up (예시)
-    short: 'Never Gonna',
     tag: 'CLASSIC',
     genre: 'Pop',
     colors: PALETTES.amber,
@@ -64,7 +62,6 @@ export const SONGS = [
   },
   {
     spotifyId: '7tFiyTwD0nx5a1eklYtX2J',  // Queen — Bohemian Rhapsody (예시)
-    short: 'Bohemian',
     tag: 'EVERGREEN',
     genre: 'Rock',
     colors: PALETTES.purple,
@@ -78,7 +75,6 @@ export const SONGS = [
   },
   {
     spotifyId: '0VjIjW4GlUZAMYd2vXMi3b',  // The Weeknd — Blinding Lights (예시)
-    short: 'Blinding',
     tag: 'RECENT',
     genre: 'Synthwave',
     colors: PALETTES.rose,

@@ -60,7 +60,6 @@ http://localhost:5173 에서 자동으로 열립니다. 상단 녹색 배너의 
 ```js
 {
   spotifyId: '4uLU6hMCjMI75M1A2tKUQC',  // Spotify에서 곡 우클릭 → 공유 → 링크 복사
-  short: '곡 짧은 이름',                 // 우측 상단 알약 버튼 표시
   tag: 'MY PICK',                       // 에디토리얼 라벨
   genre: 'Lo-fi / Bedroom Pop',         // (선택) Spotify는 트랙 장르를 안 줘서 직접 입력
   colors: PALETTES.indigo,              // 또는 PALETTES.amber, .rose, .teal 등

@@ -393,13 +393,6 @@ function SBI({ icon, label, active, accent, onClick, T, F }) {
     </div>
   );
 }
-function PB({ active, onClick, children, T, F }) {
-  return (
-    <button onClick={onClick} style={{ padding: '5px 13px', borderRadius: 18, border: active ? `1px solid ${T.borderStrong}` : '1px solid transparent', cursor: 'pointer', fontSize: 12, fontWeight: 500, fontFamily: F.body, transition: 'all 0.18s', background: active ? T.navActive : 'transparent', color: active ? T.text1 : T.text3, backdropFilter: active ? 'blur(16px)' : 'none' }}>
-      {children}
-    </button>
-  );
-}
 function CB({ children, onClick, title }) {
   return (
     <button onClick={onClick} title={title} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 5, borderRadius: 6, transition: 'opacity 0.15s' }}
@@ -493,7 +486,6 @@ export default function App() {
             art: m.art,
             duration: m.duration,
             year: m.year,
-            short: s.short || m.title.split(' ').slice(0, 2).join(' '),
             tracks: [{ n: 1, title: m.title, dur: fmtDur(m.duration) }],
             _missingMeta: false,
           };
@@ -642,7 +634,7 @@ export default function App() {
               <div key={s.id} onClick={() => playSong(s.id)} style={{ fontSize: 12, color: T.text3, padding: '7px 12px', borderRadius: 6, cursor: 'pointer', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', transition: 'color 0.15s, background 0.15s' }}
                    onMouseEnter={e => { e.currentTarget.style.color = T.text1; e.currentTarget.style.background = T.hoverBg; e.currentTarget.style.fontStyle = 'italic'; }}
                    onMouseLeave={e => { e.currentTarget.style.color = T.text3; e.currentTarget.style.background = 'transparent'; e.currentTarget.style.fontStyle = 'normal'; }}>
-                {s.short || s.title}
+                {s.title}
               </div>
             ))}
           </div>
@@ -674,24 +666,6 @@ export default function App() {
               <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', opacity: 0.28, backgroundImage: NOISE_BG }} />
             </>
           )}
-
-          {/* Top nav */}
-          <div style={{ position: 'relative', zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 24px 8px', flexShrink: 0, borderBottom: view === 'home' || view === 'album' ? `1px solid ${T.border}` : 'none' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <PB active={view === 'home'} onClick={() => setView('home')} T={view === 'player' ? getTheme('dark') : T} F={F}>홈</PB>
-              <PB active={view === 'player'} onClick={() => setView('player')} T={view === 'player' ? getTheme('dark') : T} F={F}>재생화면</PB>
-            </div>
-            {view === 'player' && (
-              <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', maxWidth: '60%', justifyContent: 'flex-end' }}>
-                {songs.map((s, i) => (
-                  <button key={s.id} onClick={() => { setSongIdx(i); setTimeout(() => audio.play(), 100); }}
-                          style={{ padding: '4px 10px', borderRadius: 14, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, fontFamily: F.body, transition: 'all 0.22s', background: i === songIdx ? s.colors.accent : 'rgba(255,255,255,0.07)', color: i === songIdx ? '#fff' : 'rgba(255,255,255,0.5)', boxShadow: i === songIdx ? `0 0 10px ${s.colors.accent}44` : 'none' }}>
-                    {s.short}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
 
           {/* Routed content */}
           <div style={{ flex: 1, position: 'relative', zIndex: 5, overflow: 'hidden', display: 'flex' }}>
