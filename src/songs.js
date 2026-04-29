@@ -1,6 +1,15 @@
 // ════════════════════════════════════════════════════════════
-//  songs.js — 이 파일만 수정하면 플레이어에 곡이 추가됩니다.
-//  This is the only file you need to edit to add your music.
+//  songs.js — 본인의 Spotify 곡 목록.
+//  This is the only file you need to edit to curate your tracks.
+//
+//  사용법: 각 항목에 spotifyId(트랙 ID)와 가사·컬러만 적으면 됩니다.
+//  나머지(제목·아티스트·앨범·앨범아트·길이·연도)는 빌드 시
+//  `node scripts/fetch-metadata.mjs`가 Spotify에서 자동으로 채웁니다.
+//
+//  spotifyId 찾는 법:
+//    Spotify 앱 → 곡 우클릭 → 공유 → "Copy Song Link"
+//    링크 https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC?si=...
+//    여기서 트랙 ID는 4uLU6hMCjMI75M1A2tKUQC 입니다.
 // ════════════════════════════════════════════════════════════
 
 // ─── 컬러 프리셋 (Palettes) ──────────────────────────────────
@@ -25,81 +34,58 @@ export const PALETTES = {
 };
 
 // ─── 노래 등록 (Your Songs) ───────────────────────────────────
-// 오디오 파일은 public/audio/ 폴더에, 앨범아트는 public/art/ 폴더에 넣으세요.
-// 그러면 audio: '/audio/파일명.mp3', art: '/art/파일명.jpg' 처럼 참조됩니다.
+// 각 곡 객체 필드:
+//   spotifyId  (필수) Spotify 트랙 ID
+//   short      (필수) 우측 상단 알약 버튼에 표시할 짧은 이름
+//   tag        (선택) 에디토리얼 라벨 (대문자 권장, 예: 'MY FAVORITE')
+//   genre      (선택) 장르 표기 — Spotify는 트랙 장르를 제공하지 않아 직접 입력
+//   colors     (필수) PALETTES 중 하나 또는 직접 정의한 5단계 컬러
+//   lyrics     (필수) [{ t: 초, text: '가사' }, ...]
 //
-// lyrics 배열은 { t: 초, text: '가사' } 객체의 리스트입니다.
-// t 값은 곡 시작 후 해당 줄이 떠야 할 시각(초 단위, 소수 가능: 0.5, 12.3 등).
-// 줄 사이 간격은 자유 — 시작에 { t:0, text:'♪' } 한 줄을 두면 인트로가 깔끔합니다.
+//   title/artist/album/art/duration/year 는 빌드 스크립트가 자동으로 채웁니다.
+//   직접 값을 넣으면 그 값이 우선 사용됩니다.
 
 export const SONGS = [
   {
-    id: 0,
-    title: 'Sample Track One',
-    short: 'Sample 1',           // 우측 상단 곡 전환 알약 버튼에 표시 (짧게)
-    artist: 'Your Artist',
-    album: 'Your Album Name',
-    duration: 180,                // 예비값(초). 오디오 메타데이터로 자동 갱신됨
-    tag: 'MY FAVORITE',           // 에디토리얼 라벨 (대문자 권장)
-    year: '2024',
-    genre: 'Pop / Indie',
-    art: '/art/sample1.jpg',      // public/art/sample1.jpg 에 파일을 두세요
-    audio: '/audio/sample1.mp3',  // public/audio/sample1.mp3 에 파일을 두세요
+    spotifyId: '4uLU6hMCjMI75M1A2tKUQC',  // Rick Astley — Never Gonna Give You Up (예시)
+    short: 'Never Gonna',
+    tag: 'CLASSIC',
+    genre: 'Pop',
     colors: PALETTES.amber,
-    tracks: [
-      { n: 1, title: 'Sample Track One', dur: '3:00' },
-      { n: 2, title: 'Track Two',        dur: '3:24' },
-      { n: 3, title: 'Track Three',      dur: '4:12' },
-    ],
     lyrics: [
       { t: 0,  text: '♪' },
-      { t: 8,  text: '여기에 가사 첫 줄을 적어주세요' },
-      { t: 14, text: '두 번째 줄, 시간 t는 초 단위입니다' },
-      { t: 22, text: '직접 들으면서 t값을 미세조정하면 됩니다' },
-      { t: 30, text: '소수점도 가능합니다 (예: 30.5)' },
+      { t: 19, text: 'We\'re no strangers to love' },
+      { t: 23, text: 'You know the rules and so do I' },
+      { t: 28, text: 'A full commitment\'s what I\'m thinking of' },
+      { t: 33, text: 'You wouldn\'t get this from any other guy' },
+      { t: 42, text: 'Never gonna give you up' },
+      { t: 45, text: 'Never gonna let you down' },
     ],
   },
   {
-    id: 1,
-    title: 'Sample Track Two',
-    short: 'Sample 2',
-    artist: 'Another Artist',
-    album: 'Another Album',
-    duration: 200,
-    tag: 'RECENT FIND',
-    year: '2024',
-    genre: 'Electronic',
-    art: '/art/sample2.jpg',
-    audio: '/audio/sample2.mp3',
-    colors: PALETTES.teal,
-    tracks: [
-      { n: 1, title: 'Sample Track Two', dur: '3:20' },
-    ],
-    lyrics: [
-      { t: 0,  text: '♪' },
-      { t: 10, text: 'Sample lyrics line 1' },
-      { t: 18, text: 'Sample lyrics line 2' },
-    ],
-  },
-  {
-    id: 2,
-    title: 'Sample Track Three',
-    short: 'Sample 3',
-    artist: 'Third Artist',
-    album: 'Third Album',
-    duration: 220,
+    spotifyId: '7tFiyTwD0nx5a1eklYtX2J',  // Queen — Bohemian Rhapsody (예시)
+    short: 'Bohemian',
     tag: 'EVERGREEN',
-    year: '2023',
-    genre: 'Jazz / Lo-fi',
-    art: '/art/sample3.jpg',
-    audio: '/audio/sample3.mp3',
-    colors: PALETTES.rose,
-    tracks: [
-      { n: 1, title: 'Sample Track Three', dur: '3:40' },
-    ],
+    genre: 'Rock',
+    colors: PALETTES.purple,
     lyrics: [
-      { t: 0, text: '♪' },
-      { t: 6, text: 'Add your own lyrics here' },
+      { t: 0,  text: '♪' },
+      { t: 14, text: 'Is this the real life?' },
+      { t: 18, text: 'Is this just fantasy?' },
+      { t: 23, text: 'Caught in a landslide' },
+      { t: 27, text: 'No escape from reality' },
+    ],
+  },
+  {
+    spotifyId: '0VjIjW4GlUZAMYd2vXMi3b',  // The Weeknd — Blinding Lights (예시)
+    short: 'Blinding',
+    tag: 'RECENT',
+    genre: 'Synthwave',
+    colors: PALETTES.rose,
+    lyrics: [
+      { t: 0,  text: '♪' },
+      { t: 13, text: 'I said, ooh, I\'m blinded by the lights' },
+      { t: 18, text: 'No, I can\'t sleep until I feel your touch' },
     ],
   },
 ];
