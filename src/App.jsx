@@ -439,6 +439,40 @@ export default function App() {
   // Complete Spotify OAuth callback if URL has ?code= on first load.
   useEffect(() => { handleCallback(); }, []);
 
+  // Eagerly populate album art via Spotify's public oEmbed endpoint, which
+  // doesn't require auth. This means the cover image shows up immediately on
+  // first load instead of waiting for the user to log in. The full /v1/tracks
+  // enrichment below still runs after login to fill in everything else
+  // (real artist names, durations, etc.).
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchArtFromOEmbed() {
+      const stale = songs.filter((s) => s.spotifyId && !s.art);
+      if (stale.length === 0) return;
+      const fetched = {};
+      for (const s of stale) {
+        if (cancelled) return;
+        try {
+          const u = `https://open.spotify.com/oembed?url=https://open.spotify.com/track/${s.spotifyId}`;
+          const res = await fetch(u);
+          if (!res.ok) continue;
+          const data = await res.json().catch(() => null);
+          if (data?.thumbnail_url) fetched[s.spotifyId] = data.thumbnail_url;
+        } catch {
+          // Network/CORS failures here are non-fatal — the post-login
+          // /v1/tracks enrichment will still fill art in eventually.
+        }
+      }
+      if (cancelled || Object.keys(fetched).length === 0) return;
+      setSongs((prev) =>
+        prev.map((s) => (fetched[s.spotifyId] && !s.art ? { ...s, art: fetched[s.spotifyId] } : s))
+      );
+    }
+    fetchArtFromOEmbed();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Once logged in, enrich any songs that are missing real metadata
   // (i.e. the build-time fetch failed or used placeholders).
   //
@@ -649,21 +683,6 @@ export default function App() {
               </div>
             ))}
           </div>
-          {view === 'home' && (
-            <div onClick={() => setView('player')} style={{ padding: '12px 14px', borderTop: `1px solid ${T.border}`, cursor: 'pointer', display: 'flex', gap: 10, alignItems: 'center' }}
-                 onMouseEnter={e => e.currentTarget.style.background = T.hoverBg}
-                 onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-              <div style={{ width: 36, height: 36, borderRadius: 5, overflow: 'hidden', flexShrink: 0 }}>
-                <img src={song.art} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                     onError={e => { e.target.parentElement.style.background = C.bg3; e.target.style.display = 'none'; }} />
-              </div>
-              <div style={{ flex: 1, overflow: 'hidden' }}>
-                <div style={{ fontSize: 11, fontWeight: 600, color: T.text1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{song.title}</div>
-                <div style={{ fontSize: 10, color: T.text3 }}>{song.artist}</div>
-              </div>
-              <div style={{ fontSize: 9, color: C.accent }}>{audio.playing ? '❚❚' : '▶'}</div>
-            </div>
-          )}
         </div>
 
         {/* Main content */}

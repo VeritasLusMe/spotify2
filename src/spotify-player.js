@@ -50,6 +50,9 @@ export function useSpotifyPlayer({ song, onEnded }) {
   const lastPositionRef = useRef(0);
   const onEndedRef = useRef(onEnded);
   onEndedRef.current = onEnded;
+  // Always-current song so callbacks aren't tied to a stale render.
+  const songRef = useRef(song);
+  songRef.current = song;
 
   const [ready, setReady] = useState(false);
   const [needsLogin, setNeedsLogin] = useState(!isLoggedIn());
@@ -185,25 +188,47 @@ export function useSpotifyPlayer({ song, onEnded }) {
     p.setVolume(v).catch(() => {});
   }, [volumeState, muted]);
 
-  // Reset visible time / duration when song id changes (before SDK responds).
+  // Reset visible time when the *track itself* changes. We deliberately do
+  // NOT depend on song?.duration here — the runtime metadata fetch can swap
+  // a placeholder duration for the real one mid-playback, and resetting
+  // lastPositionRef in that case would freeze the progress bar (it would
+  // tick from ~0 again until the SDK next emits a state change, e.g. on
+  // pause). Duration is mirrored in a separate effect below.
   useEffect(() => {
     setTime(0);
-    setDuration(song?.duration || 0);
     lastPositionRef.current = 0;
     lastStateAtRef.current = performance.now();
-  }, [song?.spotifyId, song?.duration]);
+  }, [song?.spotifyId]);
+
+  // Mirror the song's duration into local state until the SDK reports its
+  // own. Only updates the placeholder value — once the SDK has supplied a
+  // real duration we leave it alone so we don't clobber it.
+  useEffect(() => {
+    if (!song?.duration) return;
+    setDuration((prev) => (prev > 0 ? prev : song.duration));
+  }, [song?.duration]);
 
   const wantPlayRef = useRef(false);
+  // Becomes true after the first successful play call. We use this so that
+  // pressing Next/Prev later — even from a paused state — switches Spotify to
+  // the new track instead of leaving the SDK on the old URI (which would
+  // create a confusing mismatch between the UI's "current song" and what
+  // resumes when the user hits play).
+  const hasPlayedRef = useRef(false);
 
+  // Read the song from the ref so this callback is stable across re-renders.
+  // Otherwise a setTimeout/closure that captured an older `play` would send
+  // the *previous* track id to the API even after the user picked a new song.
   const play = useCallback(async () => {
-    if (!song?.spotifyId) return;
+    const current = songRef.current;
+    if (!current?.spotifyId) return;
     wantPlayRef.current = true;
     const deviceId = deviceIdRef.current;
     if (!deviceId) return; // will retry from the ready effect below
     try {
       const res = await api(`/me/player/play?device_id=${deviceId}`, {
         method: 'PUT',
-        body: JSON.stringify({ uris: [`spotify:track:${song.spotifyId}`] }),
+        body: JSON.stringify({ uris: [`spotify:track:${current.spotifyId}`] }),
       });
       if (res.status === 401) {
         setNeedsLogin(true);
@@ -214,16 +239,29 @@ export function useSpotifyPlayer({ song, onEnded }) {
         console.error('[spotify-player] play failed', res.status, txt);
       } else {
         wantPlayRef.current = false;
+        hasPlayedRef.current = true;
       }
     } catch (e) {
       if (String(e.message).includes('not_logged_in')) setNeedsLogin(true);
     }
-  }, [song?.spotifyId]);
+  }, []);
 
   // If user hit play before the SDK was ready, finish the request once we are.
   useEffect(() => {
     if (ready && wantPlayRef.current) play();
   }, [ready, play]);
+
+  // When the curated track id changes after we've started playing at least
+  // once, tell Spotify to switch tracks. Without this, picking a different
+  // song from the sidebar/home (or hitting Next/Prev) would only update the
+  // UI — Spotify would keep playing the previous URI.
+  useEffect(() => {
+    if (!song?.spotifyId) return;
+    if (!deviceIdRef.current) return; // the ready effect above will retry
+    if (!hasPlayedRef.current && !wantPlayRef.current) return;
+    play();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [song?.spotifyId, ready]);
 
   const pause = useCallback(() => {
     playerRef.current?.pause().catch(() => {});
